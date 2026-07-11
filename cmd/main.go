@@ -23,7 +23,7 @@ func main() {
 	//wait for kafka to be ready
 
 	if err := kafka.WaitForKafka(*kafkaAddr, 30*time.Second); err != nil {
-		log.Fatal("kafka nor ready:%d", err)
+		log.Fatalf("kafka nor ready:%d", err)
 	}
 
 	// app
@@ -54,4 +54,4 @@ func main() {
 	if err := app.Listen(":" + *port); err != nil {
 		log.Fatal(err)
 	}
-}
+}3
