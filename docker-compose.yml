@@ -48,6 +48,7 @@ services:
 
     ports:
       - "9092:9092"
+      - "29092:29092"
     networks:
       - app-network
 
@@ -82,6 +83,7 @@ services:
 
       ports:
         - "9094:9094"
+        - "29094:29094"
       networks:
         - app-network
 

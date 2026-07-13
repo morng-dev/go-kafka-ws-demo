@@ -16,9 +16,9 @@ import (
 )
 
 func main() {
-	// nodeID := flag.String("node", "node-1", "not id for this instance")
+	nodeID := flag.String("node", "node-1", "not id for this instance")
 	port := flag.String("port", "3000", "port to listen on")
-	kafkaAddr := flag.String("kafka", "127.0.0.1:9092", "kafka address")
+	kafkaAddr := flag.String("kafka", "127.0.0.1:29092", "kafka address")
 	flag.Parse()
 	//wait for kafka to be ready
 
@@ -39,6 +39,12 @@ func main() {
 		AllowHeaders: "Origin, Content-type, Accept",
 	}))
 
+	//create heartbeat manager
+	heartbeatMGR, err := kafka.NewHeartbeatManager(*kafkaAddr, *nodeID)
+	if err != nil {
+		log.Fatalf("fail crate heartbeat manager: %v", err)
+	}
+
 	//==== graful shutdown ====///
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGALRM)
@@ -47,6 +53,7 @@ func main() {
 		<-sigchan
 		log.Println("shutting down graacfully...")
 
+		heartbeatMGR.Stop()
 		app.ShutdownWithTimeout(10 * time.Second)
 	}()
 
