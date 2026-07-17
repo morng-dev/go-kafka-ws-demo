@@ -53,7 +53,7 @@ func NewStatusMenager(kafkaAddr, nodeID string, handler StatusHandler) (*StatusM
 		Brokers:        []string{kafkaAddr},
 		Topic:          "user-status",
 		GroupID:        "status-group-" + nodeID,
-		StartOffset:    kafka.LastOffset,
+		StartOffset:    kafka.FirstOffset,
 		MaxBytes:       10e6,
 		CommitInterval: time.Second,
 	})
@@ -71,7 +71,7 @@ func NewStatusMenager(kafkaAddr, nodeID string, handler StatusHandler) (*StatusM
 	if err := sm.rebuildStatusFromAllPartition(kafkaAddr); err != nil {
 		log.Printf("%s status rebuilding has isses: %v", nodeID, err)
 	}
-	//go sm.listenToStatus()
+	go sm.listenToStatus()
 	log.Printf("%s Status manager ready - %d users online", nodeID, sm.countOnlineUser())
 	return sm, nil
 }
@@ -132,6 +132,15 @@ func (sm *StatusManager) listenToStatus() {
 			}
 			sm.mu.Lock()
 			sm.onlineUser[status.UserID] = status
+			sm.mu.Unlock()
+
+			log.Printf("user %s status: Online=%v (node: %s)", status.UserID, status.Online, status.NodeID)
+
+			if sm.handler != nil {
+				sm.handler.HandlerUserStatus(status)
+			} else {
+				log.Printf("warning : handler is nil connot brodcat status for user %s", status.UserID)
+			}
 		}
 	}
 }
@@ -141,7 +150,7 @@ func (sm *StatusManager) rebuildStatusFromAllPartition(kafkaAddr string) error {
 	totalProcessed := 0
 	onlineCount := 0
 
-	processed, err := ReadAllPartitions(kafkaAddr, "user_status", func(msg kafka.Message) error {
+	processed, err := ReadAllPartitions(kafkaAddr, "user-status", func(msg kafka.Message) error {
 		var event Event
 		if err := json.Unmarshal(msg.Value, &event); err != nil {
 			return nil
@@ -188,4 +197,32 @@ func (sm *StatusManager) countOnlineUser() int {
 		}
 	}
 	return count
+}
+
+func (sm *StatusManager) GetOnlineUser() map[string]UserStatus {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	users := make(map[string]UserStatus)
+
+	for userId, status := range sm.onlineUser {
+		if status.Online {
+			users[userId] = status
+		}
+	}
+	return users
+}
+
+func (sm *StatusManager) Close() {
+	log.Println("Stopped status manager...")
+	sm.cancel()
+
+	if sm.kafkaWriter != nil {
+		sm.kafkaWriter.Close()
+	}
+	if sm.statusReader != nil {
+		sm.statusReader.Close()
+	}
+
+	log.Println("status manager stopped")
 }

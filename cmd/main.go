@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/morng-dev/go-kafka-ws-demo/kafka"
+	"github.com/morng-dev/go-kafka-ws-demo/realtime"
 )
 
 func main() {
@@ -39,11 +40,24 @@ func main() {
 		AllowHeaders: "Origin, Content-type, Accept",
 	}))
 
+	//create chat hub
+	chatHub, err := realtime.NewChatHub(*kafkaAddr, *nodeID)
+	if err != nil {
+		log.Fatalf("fail create Chat hub :%v", err)
+	}
+
 	//create heartbeat manager
-	heartbeatMGR, err := kafka.NewHeartbeatManager(*kafkaAddr, *nodeID)
+	heartbeatMGR, err := kafka.NewHeartbeatManager(*kafkaAddr, *nodeID, chatHub)
 	if err != nil {
 		log.Fatalf("fail crate heartbeat manager: %v", err)
 	}
+	//========== chat route ===========//
+	app.Get("/ws/:userID", chatHub.HandleClient)
+
+	app.Get("/api/users/online", func(c *fiber.Ctx) error {
+		users := chatHub.GetOnlineUser()
+		return c.JSON(users)
+	})
 
 	//==== graful shutdown ====///
 	sigchan := make(chan os.Signal, 1)

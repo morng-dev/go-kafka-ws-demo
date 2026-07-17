@@ -17,17 +17,17 @@ type NodeHeartBeat struct {
 	UserID    []string `json:"user_id"`
 }
 
-// type ChatHub interface {
-// 	GetConnectedUserID() []string
-// 	PublishUserStatus(userID, nodeID string, online bool) error
-// 	GetClientsLock() *sync.RWMutex
-// 	GetClient() map[string]interface{}
-// }
+type ChatHub interface {
+	GetConnectedUserID() []string
+	PublishUserStatus(userID, nodeID string, online bool) error
+	// GetClientsLock() *sync.RWMutex
+	// GetClient() map[string]interface{}
+}
 
 type HeartBeatManager struct {
-	mu     sync.RWMutex
-	nodeID string
-	// hub                ChatHub
+	mu                 sync.RWMutex
+	nodeID             string
+	hub                ChatHub
 	kafkaWriter        *kafka.Writer
 	heartbeartReader   *kafka.Reader
 	nodeLastSeen       map[string]int64
@@ -39,8 +39,7 @@ type HeartBeatManager struct {
 	cancel             context.CancelFunc
 }
 
-// func NewHeartbeatManager(kafkaAddr, nodeID string, hub ChatHub) (*HeartBeatManager, error) {
-func NewHeartbeatManager(kafkaAddr, nodeID string) (*HeartBeatManager, error) {
+func NewHeartbeatManager(kafkaAddr, nodeID string, hub ChatHub) (*HeartBeatManager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	km := NewKafkaManager(kafkaAddr)
 	if err := km.EnsureTopics([]string{"node-heartbeat"}); err != nil {
@@ -67,8 +66,8 @@ func NewHeartbeatManager(kafkaAddr, nodeID string) (*HeartBeatManager, error) {
 		CommitInterval: time.Second,
 	})
 	hm := &HeartBeatManager{
-		nodeID: nodeID,
-		// hub:                hub,
+		nodeID:             nodeID,
+		hub:                hub,
 		kafkaWriter:        writer,
 		heartbeartReader:   reader,
 		nodeLastSeen:       make(map[string]int64),
@@ -147,8 +146,7 @@ func (hm *HeartBeatManager) sendheatbeat() {
 }
 
 func (hm *HeartBeatManager) publishHeartbeat() error {
-	// usersID := hm.hub.GetConnectedUserID()
-	usersID := []string{""}
+	usersID := hm.hub.GetConnectedUserID()
 	heartbeat := NodeHeartBeat{
 		NodeID:    hm.nodeID,
 		TimeStamp: time.Now().Unix(),
@@ -291,7 +289,12 @@ func (hm *HeartBeatManager) HandleDeadNode(nodeID string) {
 	log.Printf("Headling Dead Node %s : Marking %d user as offline", nodeID, len(usersID))
 
 	for _, userID := range usersID {
-		log.Printf("User %s marked offline (from dead node : %s)", userID, nodeID)
+		if err := hm.hub.PublishUserStatus(userID, nodeID, false); err != nil {
+			log.Printf("fail to publish offline status for user %s:%v", userID, err)
+		} else {
+
+			log.Printf("User %s marked offline (from dead node : %s)", userID, nodeID)
+		}
 	}
 }
 
