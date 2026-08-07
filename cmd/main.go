@@ -68,6 +68,7 @@ func main() {
 		log.Println("shutting down graacfully...")
 
 		heartbeatMGR.Stop()
+		chatHub.Close()
 		app.ShutdownWithTimeout(10 * time.Second)
 	}()
 

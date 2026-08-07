@@ -229,7 +229,7 @@ func (hm *HeartBeatManager) handleHeartBeat(heartbeat NodeHeartBeat) {
 		delete(hm.processedDeadNodes, heartbeat.NodeID)
 	}
 
-	log.Printf("Heartbeat received : node=%s, user=%d, timestamp=%d", heartbeat.NodeID, len(heartbeat.NodeID), heartbeat.TimeStamp)
+	log.Printf("Heartbeat received : node=%s, user=%d, timestamp=%d", heartbeat.NodeID, len(heartbeat.UserID), heartbeat.TimeStamp)
 }
 
 func (hm *HeartBeatManager) monitorNodeHealth() {

@@ -16,10 +16,8 @@ func (h *ChatHub) HandleClient(c *fiber.Ctx) error {
 		if userID == "" {
 			return fiber.ErrBadRequest
 		}
-
 		return websocket.New(func(conn *websocket.Conn) {
 			conn.SetReadLimit(8192)
-
 			client := h.RegisterClient(userID, conn)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -27,7 +25,7 @@ func (h *ChatHub) HandleClient(c *fiber.Ctx) error {
 			cleanup := func() {
 				if !cleanupDone {
 					cleanupDone = true
-					log.Printf("cleanup connection for user %s", userID)
+					log.Printf("Cleanup connection for user %s", userID)
 					h.unregisterClint(userID)
 					conn.Close()
 					cancel()
@@ -36,9 +34,9 @@ func (h *ChatHub) HandleClient(c *fiber.Ctx) error {
 			defer cleanup()
 
 			h.sendInitalState(client)
-			h.handleIncomeWebsocketMessage(ctx, client, cleanup)
 			go h.handlePingPong(ctx, client, cleanup)
-			go h.handleOutgoingWebsocketMessages(ctx, client, cleanup)
+			go h.handleIncomeWebsocketMessage(ctx, client, cleanup)
+			h.handleOutgoingWebsocketMessages(ctx, client, cleanup)
 
 		})(c)
 	}
@@ -55,16 +53,15 @@ func (h *ChatHub) sendInitalState(client *Client) {
 		},
 	}
 	if err := client.Conn.WriteJSON(initalState); err != nil {
-		log.Printf("Error sending iniial state to user %s : %v", client.UserID, err)
+		log.Printf("Error sending initital state to user %s : %v", client.UserID, err)
 	} else {
-		log.Printf("Sent initial state to %s : %d online users", client.UserID, len(onlineusers))
+		log.Printf("sent initial state to %s : %d online users", client.UserID, len(onlineusers))
 	}
 }
 
 func (h *ChatHub) handlePingPong(ctx context.Context, client *Client, cleanup func()) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -126,7 +123,6 @@ func (h *ChatHub) handleOutgoingWebsocketMessages(ctx context.Context, client *C
 				client.mu.Unlock()
 				return
 			}
-
 			if err := client.Conn.WriteJSON(data); err != nil {
 				client.mu.Unlock()
 				return
