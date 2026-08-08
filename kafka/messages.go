@@ -180,7 +180,7 @@ func (mm *MessageManager) listenToMessages() {
 		if event.Type == "message" {
 			var chatMeg Message
 			if err := json.Unmarshal(event.Data, &chatMeg); err != nil {
-				log.Printf("Error unmarshal message: %v")
+				log.Printf("Error unmarshal message: %v", err)
 			}
 			if !mm.MessageCache.Add(chatMeg.MessageID) {
 				log.Printf("Duplicated message Ignored:%s", chatMeg.MessageID)

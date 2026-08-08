@@ -89,3 +89,19 @@ func (h *NotificationHub) DeliverNotification(notif *kafka.Notification) {
 		log.Printf("Notification user %s not connected to this node", notif.UserID)
 	}
 }
+
+func (h *NotificationHub) SendNotification(notif *kafka.Notification) error {
+	return h.notificationManager.PublishNotification(notif)
+}
+
+func (h *NotificationHub) GetConnectedUser() []string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	user := make([]string, 0, len(h.clients))
+
+	for userID := range h.clients {
+		user = append(user, userID)
+	}
+	return user
+}
