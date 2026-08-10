@@ -51,12 +51,47 @@ func main() {
 	if err != nil {
 		log.Fatalf("fail crate heartbeat manager: %v", err)
 	}
+
+	notifHub, err := realtime.NewNotificationHub(*kafkaAddr, *nodeID)
+	if err != nil {
+		log.Fatal("fail to careate notificationHub: %v", err)
+	}
+
 	//========== chat route ===========//
 	app.Get("/ws/:userID", chatHub.HandleClient)
 
 	app.Get("/api/users/online", func(c *fiber.Ctx) error {
 		users := chatHub.GetOnlineUser()
 		return c.JSON(users)
+	})
+	//========== notification route ===========//
+	app.Get("/ws/:userID", notifHub.HandleNotificationClient)
+	// RestApi to send Notification
+	app.Post("api/notification/send", func(c *fiber.Ctx) error {
+		var notif kafka.Notification
+		if err := c.BodyParser(&notif); err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid request body",
+			})
+		}
+		if notif.UserID == "" {
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid request body",
+			})
+		}
+		if notif.Title == "" {
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid request body",
+			})
+		}
+		if err := notifHub.SendNotification(&notif); err != nil {
+			log.Printf("Fail to send notifaication: %v", err)
+		}
+		return c.JSON(fiber.Map{
+			"success":         true,
+			"message":         "notification sent",
+			"notification_id": notif.ID,
+		})
 	})
 
 	//==== graful shutdown ====///
@@ -69,6 +104,7 @@ func main() {
 
 		heartbeatMGR.Stop()
 		chatHub.Close()
+		notifHub.Close()
 		app.ShutdownWithTimeout(10 * time.Second)
 	}()
 
